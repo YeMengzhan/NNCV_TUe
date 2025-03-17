@@ -109,20 +109,36 @@ class Attention(nn.Module):
     def __init__(self, dim, num_heads=8, qkv_bias=False, qk_scale=None, attn_drop=0., proj_drop=0.):
         super().__init__()
         self.num_heads = num_heads
-        head_dim = dim // num_heads
-        self.scale = qk_scale or head_dim ** -0.5
+        head_dim = dim // num_heads  # Dimension per head
+        self.scale = qk_scale or head_dim ** -0.5  # Scaling factor for stability
 
+        # Linear layers for Query, Key, and Value (QKV)
         self.qkv = nn.Linear(dim, dim * 3, bias=qkv_bias)
-        self.attn_drop = nn.Dropout(attn_drop)
-        self.proj = nn.Linear(dim, dim)
-        self.proj_drop = nn.Dropout(proj_drop)
+        self.attn_drop = nn.Dropout(attn_drop) # Dropout for attention scores
+        self.proj = nn.Linear(dim, dim)  # Final projection layer
+        self.proj_drop = nn.Dropout(proj_drop) # Dropout for output
 
     def forward(self, x):
-        B, N, C = x.shape
+        B, N, C = x.shape # Batch size, Number of tokens, Embedding dimension
+
+        # Compute Q, K, V using linear transformation and reshape for multi-head attention
         qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
 
         #TODO: complete the forward pass
         # q, k, v = 
+        q, k, v = qkv[0], qkv[1], qkv[2]  # Extract Q, K, V
+
+        # Compute attention scores: QK^T / sqrt(d_k)
+        attn = (q @ k.transpose(-2, -1)) * self.scale
+        attn = attn.softmax(dim=-1)  # Apply softmax to get attention weights
+        attn = self.attn_drop(attn)  # Apply dropout
+
+        # Multiply attention scores with Value (V)
+        x = (attn @ v).transpose(1, 2).reshape(B, N, C)
+
+        # Final projection
+        x = self.proj(x)
+        x = self.proj_drop(x)
         
         return x, attn
 
@@ -193,20 +209,23 @@ class PatchEmbed(nn.Module):
     """
     def __init__(self, img_size=224, patch_size=16, in_chans=3, embed_dim=768):
         super().__init__()
-        num_patches = (img_size // patch_size) * (img_size // patch_size)
+        num_patches = (img_size // patch_size) * (img_size // patch_size)  # Total number of patches
         self.img_size = img_size
         self.patch_size = patch_size
         self.num_patches = num_patches
 
+        # Convolutional layer to extract patch embeddings
         self.proj = nn.Conv2d(in_chans, embed_dim, kernel_size=patch_size, stride=patch_size)
 
     def forward(self, x):
-        B, C, H, W = x.shape
+        B, C, H, W = x.shape   # Batch size, Channels, Height, Width
         
         # TODO: Complete the forward pass
-        # x =
+        # x = ...  to convert image into patches and flatten
+        x = self.proj(x).flatten(2).transpose(1, 2)
 
         return x
+
 
 
 class VisionTransformer(nn.Module):
